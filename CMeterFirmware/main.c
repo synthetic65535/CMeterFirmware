@@ -3,33 +3,33 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 
-// ---------------------------------------------------------------- Настройки
+// ---------------------------------------------------------------- РќР°СЃС‚СЂРѕР№РєРё
 
-#define DISPLAY_UPDATE_DELAY 2000 /* Задержка при обновлении дисплея. Чем больше это число, тем больше будет яркость дисплея и меньше время автономной работы. */
-#define PRE_COEFF 38.461 /* Предварительных коэффициент для преобразования показаний АЦП в Амперы. Шунт: 510 Ом */
-#define CURRENT_CHANGE_SENSITIVITY 0.1 /* Чувствительность на изменени тока */
-#define MINIMUM_CURRENT 0.5 /* Минимально допустимый рабочий ток измеряемых двигателей, Ампер */
-#define MINIMUM_VOLTAGE 4.5 /* Минимально допустимое напряжение питания устройства */
+#define DISPLAY_UPDATE_DELAY 2000 /* Р—Р°РґРµСЂР¶РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РґРёСЃРїР»РµСЏ. Р§РµРј Р±РѕР»СЊС€Рµ СЌС‚Рѕ С‡РёСЃР»Рѕ, С‚РµРј Р±РѕР»СЊС€Рµ Р±СѓРґРµС‚ СЏСЂРєРѕСЃС‚СЊ РґРёСЃРїР»РµСЏ Рё РјРµРЅСЊС€Рµ РІСЂРµРјСЏ Р°РІС‚РѕРЅРѕРјРЅРѕР№ СЂР°Р±РѕС‚С‹. */
+#define PRE_COEFF 38.461 /* РџСЂРµРґРІР°СЂРёС‚РµР»СЊРЅС‹С… РєРѕСЌС„С„РёС†РёРµРЅС‚ РґР»СЏ РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ РїРѕРєР°Р·Р°РЅРёР№ РђР¦Рџ РІ РђРјРїРµСЂС‹. РЁСѓРЅС‚: 510 РћРј */
+#define CURRENT_CHANGE_SENSITIVITY 0.1 /* Р§СѓРІСЃС‚РІРёС‚РµР»СЊРЅРѕСЃС‚СЊ РЅР° РёР·РјРµРЅРµРЅРё С‚РѕРєР° */
+#define MINIMUM_CURRENT 0.5 /* РњРёРЅРёРјР°Р»СЊРЅРѕ РґРѕРїСѓСЃС‚РёРјС‹Р№ СЂР°Р±РѕС‡РёР№ С‚РѕРє РёР·РјРµСЂСЏРµРјС‹С… РґРІРёРіР°С‚РµР»РµР№, РђРјРїРµСЂ */
+#define MINIMUM_VOLTAGE 4.5 /* РњРёРЅРёРјР°Р»СЊРЅРѕ РґРѕРїСѓСЃС‚РёРјРѕРµ РЅР°РїСЂСЏР¶РµРЅРёРµ РїРёС‚Р°РЅРёСЏ СѓСЃС‚СЂРѕР№СЃС‚РІР° */
 
-// ---------------------------------------------------------------- Технические константы
+// ---------------------------------------------------------------- РўРµС…РЅРёС‡РµСЃРєРёРµ РєРѕРЅСЃС‚Р°РЅС‚С‹
 
 #define F_CPU 8000000
 
-#define ADC_BITS 10 /* Разрешение АЦП */
-#define ADC_MAX_VAL ((1 << ADC_BITS) - 1) /* Максимально возможные показания АЦП */
-#define ADC_HALF_VAL ((1 << (ADC_BITS - 1)) - 1) /* Середина размаха АЦП */
-#define REFERENCE_VOLTAGE 2.495 /* Опорное напряжение */
-#define VOLTAGE_DIVIDER 0.5 /* Делитель для измерения напряжения */
-#define CONTROL_DIVIDER 0.5 /* Делитель для контроля АЦП */
+#define ADC_BITS 10 /* Р Р°Р·СЂРµС€РµРЅРёРµ РђР¦Рџ */
+#define ADC_MAX_VAL ((1 << ADC_BITS) - 1) /* РњР°РєСЃРёРјР°Р»СЊРЅРѕ РІРѕР·РјРѕР¶РЅС‹Рµ РїРѕРєР°Р·Р°РЅРёСЏ РђР¦Рџ */
+#define ADC_HALF_VAL ((1 << (ADC_BITS - 1)) - 1) /* РЎРµСЂРµРґРёРЅР° СЂР°Р·РјР°С…Р° РђР¦Рџ */
+#define REFERENCE_VOLTAGE 2.495 /* РћРїРѕСЂРЅРѕРµ РЅР°РїСЂСЏР¶РµРЅРёРµ */
+#define VOLTAGE_DIVIDER 0.5 /* Р”РµР»РёС‚РµР»СЊ РґР»СЏ РёР·РјРµСЂРµРЅРёСЏ РЅР°РїСЂСЏР¶РµРЅРёСЏ */
+#define CONTROL_DIVIDER 0.5 /* Р”РµР»РёС‚РµР»СЊ РґР»СЏ РєРѕРЅС‚СЂРѕР»СЏ РђР¦Рџ */
 
-#define WAIT_FOR_ADC {adc_timeout_counter = 0; while (((ADCSRA & (1 << ADSC)) != 0) && (adc_timeout_counter++ < 0xfff0)) asm("nop");} /* Ждём окончания преобразования АЦП */
-#define ADC_START_CONVERSION ADCSRA |= (1 << ADSC); /* Начать преобразование АЦП */
+#define WAIT_FOR_ADC {adc_timeout_counter = 0; while (((ADCSRA & (1 << ADSC)) != 0) && (adc_timeout_counter++ < 0xfff0)) asm("nop");} /* Р–РґС‘Рј РѕРєРѕРЅС‡Р°РЅРёСЏ РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ РђР¦Рџ */
+#define ADC_START_CONVERSION ADCSRA |= (1 << ADSC); /* РќР°С‡Р°С‚СЊ РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёРµ РђР¦Рџ */
 
-#define MEASUREMENTS_COUNT 9 /* Сколько делать измерений тока для получения медианы. Нечётное число больше 4 и меньше 255 */
+#define MEASUREMENTS_COUNT 9 /* РЎРєРѕР»СЊРєРѕ РґРµР»Р°С‚СЊ РёР·РјРµСЂРµРЅРёР№ С‚РѕРєР° РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ РјРµРґРёР°РЅС‹. РќРµС‡С‘С‚РЅРѕРµ С‡РёСЃР»Рѕ Р±РѕР»СЊС€Рµ 4 Рё РјРµРЅСЊС€Рµ 255 */
 
 #define DOT_POINT 0b10000000
 
-// ---------------------------------------------------------------- Константы-строки
+// ---------------------------------------------------------------- РљРѕРЅСЃС‚Р°РЅС‚С‹-СЃС‚СЂРѕРєРё
 
 const uint8_t chars[] PROGMEM = {
 	0b00111111, // 0
@@ -42,55 +42,55 @@ const uint8_t chars[] PROGMEM = {
 	0b00000111, // 7
 	0b01111111, // 8
 	0b01101111, // 9
-	0b00000000, // Пробел
+	0b00000000, // РџСЂРѕР±РµР»
 	0b01111001, // E
 	0b01010000, // R
 	0b01000000  // -
 };
 
-// ---------------------------------------------------------------- Структуры
+// ---------------------------------------------------------------- РЎС‚СЂСѓРєС‚СѓСЂС‹
 
-// Состояние дисплея
+// РЎРѕСЃС‚РѕСЏРЅРёРµ РґРёСЃРїР»РµСЏ
 typedef enum DISPLAY_STATE
 {
-	DISPLAY_STATE_CURRENT = 0, /* Отобразить ток */
-	DISPLAY_STATE_PERCENT = 1, /* Отобразить проценты */
-	DISPLAY_STATE_ERROR = 2, /* Отобразить "Err" */
-	DISPLAY_STATE_MEASURING = 3, /* Отобразить "---" */
+	DISPLAY_STATE_CURRENT = 0, /* РћС‚РѕР±СЂР°Р·РёС‚СЊ С‚РѕРє */
+	DISPLAY_STATE_PERCENT = 1, /* РћС‚РѕР±СЂР°Р·РёС‚СЊ РїСЂРѕС†РµРЅС‚С‹ */
+	DISPLAY_STATE_ERROR = 2, /* РћС‚РѕР±СЂР°Р·РёС‚СЊ "Err" */
+	DISPLAY_STATE_MEASURING = 3, /* РћС‚РѕР±СЂР°Р·РёС‚СЊ "---" */
 } DISPLAY_STATE_t;
 
 // ----------------------------------------------------------------
 
-// Состояние прибора
+// РЎРѕСЃС‚РѕСЏРЅРёРµ РїСЂРёР±РѕСЂР°
 typedef enum DEVICE_STATE
 {
-	DEVICE_STATE_STANDBY = 0, /* Наблюдение за изменением тока и напряжения */
-	DEVICE_STATE_PREPARE = 1, /* Подготовка к измерению тока */
-	DEVICE_STATE_MEASURE = 2, /* Измерение тока */
+	DEVICE_STATE_STANDBY = 0, /* РќР°Р±Р»СЋРґРµРЅРёРµ Р·Р° РёР·РјРµРЅРµРЅРёРµРј С‚РѕРєР° Рё РЅР°РїСЂСЏР¶РµРЅРёСЏ */
+	DEVICE_STATE_PREPARE = 1, /* РџРѕРґРіРѕС‚РѕРІРєР° Рє РёР·РјРµСЂРµРЅРёСЋ С‚РѕРєР° */
+	DEVICE_STATE_MEASURE = 2, /* РР·РјРµСЂРµРЅРёРµ С‚РѕРєР° */
 } DEVICE_STATE_t;
 
-// ---------------------------------------------------------------- Переменные
+// ---------------------------------------------------------------- РџРµСЂРµРјРµРЅРЅС‹Рµ
 
-volatile uint16_t brightness_delay; // Задержка для компенсации яркости
+volatile uint16_t brightness_delay; // Р—Р°РґРµСЂР¶РєР° РґР»СЏ РєРѕРјРїРµРЅСЃР°С†РёРё СЏСЂРєРѕСЃС‚Рё
 
-volatile uint32_t display_number; // Псевдо-дробное число, две цифры после запятой
-volatile uint8_t display_chars[3]; // Символы для вывода на дисплей
-volatile DISPLAY_STATE_t display_state; // Что отобразить на дисплее
+volatile uint32_t display_number; // РџСЃРµРІРґРѕ-РґСЂРѕР±РЅРѕРµ С‡РёСЃР»Рѕ, РґРІРµ С†РёС„СЂС‹ РїРѕСЃР»Рµ Р·Р°РїСЏС‚РѕР№
+volatile uint8_t display_chars[3]; // РЎРёРјРІРѕР»С‹ РґР»СЏ РІС‹РІРѕРґР° РЅР° РґРёСЃРїР»РµР№
+volatile DISPLAY_STATE_t display_state; // Р§С‚Рѕ РѕС‚РѕР±СЂР°Р·РёС‚СЊ РЅР° РґРёСЃРїР»РµРµ
 
-volatile uint8_t display_update_state; // Состояние автомата, обновляющего дисплей
+volatile uint8_t display_update_state; // РЎРѕСЃС‚РѕСЏРЅРёРµ Р°РІС‚РѕРјР°С‚Р°, РѕР±РЅРѕРІР»СЏСЋС‰РµРіРѕ РґРёСЃРїР»РµР№
 uint16_t adc_timeout_counter;
 
-volatile uint16_t adc_result; // Результат измерения АЦП
-uint16_t adc_readings_count; // Количество считываний
-uint32_t adc_readings_sum; // Сумма считываний
+volatile uint16_t adc_result; // Р РµР·СѓР»СЊС‚Р°С‚ РёР·РјРµСЂРµРЅРёСЏ РђР¦Рџ
+uint16_t adc_readings_count; // РљРѕР»РёС‡РµСЃС‚РІРѕ СЃС‡РёС‚С‹РІР°РЅРёР№
+uint32_t adc_readings_sum; // РЎСѓРјРјР° СЃС‡РёС‚С‹РІР°РЅРёР№
 
-uint8_t measuring_higher_current; /* Будем ли мы измерять больший ток */
-DEVICE_STATE_t device_state; /* Состояние прибора */
-uint8_t standby_measuring_current; /* Измеряем ли мы ток в режиме STANDBY */
-float current; // Ток, ампер
-float voltage; // Напряжение, вольт
-float percent; // Проценты
-float control; // Контроль АЦП
+uint8_t measuring_higher_current; /* Р‘СѓРґРµРј Р»Рё РјС‹ РёР·РјРµСЂСЏС‚СЊ Р±РѕР»СЊС€РёР№ С‚РѕРє */
+DEVICE_STATE_t device_state; /* РЎРѕСЃС‚РѕСЏРЅРёРµ РїСЂРёР±РѕСЂР° */
+uint8_t standby_measuring_current; /* РР·РјРµСЂСЏРµРј Р»Рё РјС‹ С‚РѕРє РІ СЂРµР¶РёРјРµ STANDBY */
+float current; // РўРѕРє, Р°РјРїРµСЂ
+float voltage; // РќР°РїСЂСЏР¶РµРЅРёРµ, РІРѕР»СЊС‚
+float percent; // РџСЂРѕС†РµРЅС‚С‹
+float control; // РљРѕРЅС‚СЂРѕР»СЊ РђР¦Рџ
 float measured_currents[2];
 uint8_t measured_currents_count;
 float prev_current;
@@ -100,9 +100,9 @@ uint8_t measurements_count;
 
 // ---------------------------------------------------------------- eeprom
 
-// ---------------------------------------------------------------- Инициализация
+// ---------------------------------------------------------------- РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ
 
-// Инициализация сторожевого таймера
+// РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЃС‚РѕСЂРѕР¶РµРІРѕРіРѕ С‚Р°Р№РјРµСЂР°
 void init_wdt(void)
 {
     asm("wdr");
@@ -111,7 +111,7 @@ void init_wdt(void)
 
 // ----------------------------------------------------------------
 
-// Инициализация пинов
+// РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїРёРЅРѕРІ
 void init_gpio(void)
 {
     DDRB = (1 << PINB0) | (1 << PINB1) | (1 << PINB2); // DIG1 - DIG3
@@ -122,7 +122,7 @@ void init_gpio(void)
     // TODO: disable ADC at PC3, PC4, PC5
 	// TODO: disable unnecessary peripherals
 	
-    // Выключаем PULL-UP резисторы
+    // Р’С‹РєР»СЋС‡Р°РµРј PULL-UP СЂРµР·РёСЃС‚РѕСЂС‹
     PORTB = 0;
     PORTC = (1 << PINC4) | (1 << PINC5); // BTN1, BTN2
     PORTD = 0;
@@ -130,7 +130,7 @@ void init_gpio(void)
 
 // ----------------------------------------------------------------
 
-// Инициализация таймера, отвечающего за обновление дисплея
+// РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ С‚Р°Р№РјРµСЂР°, РѕС‚РІРµС‡Р°СЋС‰РµРіРѕ Р·Р° РѕР±РЅРѕРІР»РµРЅРёРµ РґРёСЃРїР»РµСЏ
 void init_tc1(void)
 {
 	TCCR1A = (0 << COM1A1) | (0 << COM1A0) | (0 << COM1B1) | (0 << COM1B0) | (1 << FOC1A) | (0 << FOC1B) | (0 << WGM11) | (0 << WGM10);
@@ -149,7 +149,7 @@ void init_tc1(void)
 #define ADC_MUX_CURRENT 1
 #define ADC_MUX_VOLTAGE 2
 
-// Инициализация АЦП
+// РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РђР¦Рџ
 void init_adc(const uint8_t input)
 {
 	ADCSRA = 0; // Disable ADC
@@ -162,9 +162,9 @@ void init_adc(const uint8_t input)
 #define ADC_DIVISOR 128
 #define ADC_MEASURINGS_PER_SEC (F_CPU / ADC_DIVISOR / 13)
 
-// ---------------------------------------------------------------- Функции
+// ---------------------------------------------------------------- Р¤СѓРЅРєС†РёРё
 
-// Функция, для преобразования числа в символы, отображаемые на дисплее
+// Р¤СѓРЅРєС†РёСЏ, РґР»СЏ РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ С‡РёСЃР»Р° РІ СЃРёРјРІРѕР»С‹, РѕС‚РѕР±СЂР°Р¶Р°РµРјС‹Рµ РЅР° РґРёСЃРїР»РµРµ
 void display_update(void)
 {
 	if ((display_number > 99900) || (display_state == DISPLAY_STATE_ERROR))
@@ -185,7 +185,7 @@ void display_update(void)
 	
 	uint32_t display_number_temp;
 	display_number_temp = display_number;
-	// TODO: При копировании переменного-числа для отображения делать округление
+	// TODO: РџСЂРё РєРѕРїРёСЂРѕРІР°РЅРёРё РїРµСЂРµРјРµРЅРЅРѕРіРѕ-С‡РёСЃР»Р° РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РґРµР»Р°С‚СЊ РѕРєСЂСѓРіР»РµРЅРёРµ
 	uint8_t tmp_digits[5];
 	
 	for (uint8_t i=0; i<5; i++)
@@ -194,27 +194,27 @@ void display_update(void)
 		display_number_temp /= 10;
 	}
 	
-	if (display_state == DISPLAY_STATE_PERCENT) // Проценты
+	if (display_state == DISPLAY_STATE_PERCENT) // РџСЂРѕС†РµРЅС‚С‹
 	{
 		if (tmp_digits[4] != 0)
 		{
 			display_chars[0] = pgm_read_byte(&chars[tmp_digits[4]]);
 		} else {
-			display_chars[0] = pgm_read_byte(&chars[10]); // Пробел
+			display_chars[0] = pgm_read_byte(&chars[10]); // РџСЂРѕР±РµР»
 		}
 		
 		if (tmp_digits[3] != 0)
 		{
 			display_chars[1] = pgm_read_byte(&chars[tmp_digits[3]]);
 		} else {
-			display_chars[1] = pgm_read_byte(&chars[10]); // Пробел
+			display_chars[1] = pgm_read_byte(&chars[10]); // РџСЂРѕР±РµР»
 		}
 		
 		display_chars[2] = pgm_read_byte(&chars[tmp_digits[2]])/* | DOT_POINT*/;
 		return;
 	}
 	
-	if (tmp_digits[4] != 0) // Число с тремя знаками до запятой
+	if (tmp_digits[4] != 0) // Р§РёСЃР»Рѕ СЃ С‚СЂРµРјСЏ Р·РЅР°РєР°РјРё РґРѕ Р·Р°РїСЏС‚РѕР№
 	{
 		display_chars[0] = pgm_read_byte(&chars[tmp_digits[4]]);
 		display_chars[1] = pgm_read_byte(&chars[tmp_digits[3]]);
@@ -222,7 +222,7 @@ void display_update(void)
 		return;
 	}
 	
-	if (tmp_digits[3] != 0) // Число с двумя знаками до запятой
+	if (tmp_digits[3] != 0) // Р§РёСЃР»Рѕ СЃ РґРІСѓРјСЏ Р·РЅР°РєР°РјРё РґРѕ Р·Р°РїСЏС‚РѕР№
 	{
 		display_chars[0] = pgm_read_byte(&chars[tmp_digits[3]]);
 		display_chars[1] = pgm_read_byte(&chars[tmp_digits[2]]) | DOT_POINT;
@@ -237,13 +237,13 @@ void display_update(void)
 
 // ----------------------------------------------------------------
 
-// Инициализация всего
+// РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РІСЃРµРіРѕ
 void init_all(void)
 {
-	init_wdt(); // Инициализация сторожевого таймера
-	init_gpio(); // Инициализация пинов
-	init_tc1(); // Инициализация таймера, обновляющего дисплей
-	init_adc(ADC_MUX_CONTROL); // Сначала измеряем контрольную точку
+	init_wdt(); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЃС‚РѕСЂРѕР¶РµРІРѕРіРѕ С‚Р°Р№РјРµСЂР°
+	init_gpio(); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїРёРЅРѕРІ
+	init_tc1(); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ С‚Р°Р№РјРµСЂР°, РѕР±РЅРѕРІР»СЏСЋС‰РµРіРѕ РґРёСЃРїР»РµР№
+	init_adc(ADC_MUX_CONTROL); // РЎРЅР°С‡Р°Р»Р° РёР·РјРµСЂСЏРµРј РєРѕРЅС‚СЂРѕР»СЊРЅСѓСЋ С‚РѕС‡РєСѓ
 	sei();
 	
 	brightness_delay = 0xffff;
@@ -252,31 +252,31 @@ void init_all(void)
 	standby_measuring_current = 0;
 	brightness_delay = 0xffff;
 	prev_current = 0;
-	device_state = DEVICE_STATE_PREPARE; // Сначала измеряем контрольную точку
+	device_state = DEVICE_STATE_PREPARE; // РЎРЅР°С‡Р°Р»Р° РёР·РјРµСЂСЏРµРј РєРѕРЅС‚СЂРѕР»СЊРЅСѓСЋ С‚РѕС‡РєСѓ
 	display_state = DISPLAY_STATE_MEASURING;
 	display_update();
 }
 
 // ----------------------------------------------------------------
 
-// ---------------------------------------------------------------- Прерывания
+// ---------------------------------------------------------------- РџСЂРµСЂС‹РІР°РЅРёСЏ
 
-// Прерывание АЦП, только для датчика тока
+// РџСЂРµСЂС‹РІР°РЅРёРµ РђР¦Рџ, С‚РѕР»СЊРєРѕ РґР»СЏ РґР°С‚С‡РёРєР° С‚РѕРєР°
 ISR (ADC_vect)
 {
-	// TODO: все-таки выбрасывать первое измерение, точность увеличится
+	// TODO: РІСЃРµ-С‚Р°РєРё РІС‹Р±СЂР°СЃС‹РІР°С‚СЊ РїРµСЂРІРѕРµ РёР·РјРµСЂРµРЅРёРµ, С‚РѕС‡РЅРѕСЃС‚СЊ СѓРІРµР»РёС‡РёС‚СЃСЏ
 	adc_readings_sum += ADCW;
 	adc_readings_count++;
 }
 
 // ----------------------------------------------------------------
 
-// Прерывание таймера, обновляющего экран
+// РџСЂРµСЂС‹РІР°РЅРёРµ С‚Р°Р№РјРµСЂР°, РѕР±РЅРѕРІР»СЏСЋС‰РµРіРѕ СЌРєСЂР°РЅ
 ISR (TIMER1_COMPA_vect)
 {
 	if (display_update_state < 3)
 	{
-		// В состоянии 0, 1, 2 показываем символы
+		// Р’ СЃРѕСЃС‚РѕСЏРЅРёРё 0, 1, 2 РїРѕРєР°Р·С‹РІР°РµРј СЃРёРјРІРѕР»С‹
 		PORTB = 0;
 		PORTD = display_chars[display_update_state];
 		PORTB = (1 << display_update_state);
@@ -284,12 +284,12 @@ ISR (TIMER1_COMPA_vect)
 		if (display_update_state == 0)
 		{
 			OCR1A = DISPLAY_UPDATE_DELAY;
-			if ((display_state == DISPLAY_STATE_PERCENT) && ((adc_readings_count & (1 << 8)) || (display_number == 0))) PORTC |= (1 << PINC3); // При необходимости вместе с первым символом включаем светодиоды "процент"
+			if ((display_state == DISPLAY_STATE_PERCENT) && ((adc_readings_count & (1 << 8)) || (display_number == 0))) PORTC |= (1 << PINC3); // РџСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РІРјРµСЃС‚Рµ СЃ РїРµСЂРІС‹Рј СЃРёРјРІРѕР»РѕРј РІРєР»СЋС‡Р°РµРј СЃРІРµС‚РѕРґРёРѕРґС‹ "РїСЂРѕС†РµРЅС‚"
 		} else {
-			PORTC &= ~(1 << PINC3); // Выключаем светодиоды "процент"
+			PORTC &= ~(1 << PINC3); // Р’С‹РєР»СЋС‡Р°РµРј СЃРІРµС‚РѕРґРёРѕРґС‹ "РїСЂРѕС†РµРЅС‚"
 		}
 	} else {
-		// После отображения последнего символа выключаем табло и ждём
+		// РџРѕСЃР»Рµ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РїРѕСЃР»РµРґРЅРµРіРѕ СЃРёРјРІРѕР»Р° РІС‹РєР»СЋС‡Р°РµРј С‚Р°Р±Р»Рѕ Рё Р¶РґС‘Рј
 		PORTB = 0;
 		PORTD = 0;
 		OCR1A = brightness_delay;
@@ -299,7 +299,7 @@ ISR (TIMER1_COMPA_vect)
 	{
 		display_update_state = 0;
 	}
-	// TODO: ускорить код в прерывании
+	// TODO: СѓСЃРєРѕСЂРёС‚СЊ РєРѕРґ РІ РїСЂРµСЂС‹РІР°РЅРёРё
 }
 
 // ---------------------------------------------------------------- main
@@ -312,23 +312,23 @@ int main(void)
     {
 		switch (device_state)
 		{
-			case DEVICE_STATE_STANDBY: { // Наблюдение за напряжением питания и током
+			case DEVICE_STATE_STANDBY: { // РќР°Р±Р»СЋРґРµРЅРёРµ Р·Р° РЅР°РїСЂСЏР¶РµРЅРёРµРј РїРёС‚Р°РЅРёСЏ Рё С‚РѕРєРѕРј
 				if (standby_measuring_current)
 				{
-					// Наблюдение за током
-					if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 3)) // 0.33 сек
+					// РќР°Р±Р»СЋРґРµРЅРёРµ Р·Р° С‚РѕРєРѕРј
+					if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 3)) // 0.33 СЃРµРє
 					{
-						adc_readings_count -= 1; // Первое измерение было выброшено
+						adc_readings_count -= 1; // РџРµСЂРІРѕРµ РёР·РјРµСЂРµРЅРёРµ Р±С‹Р»Рѕ РІС‹Р±СЂРѕС€РµРЅРѕ
 						current = ((float)(adc_readings_sum)) / ((float)(adc_readings_count)) / ((float)(PRE_COEFF)) * control;
 						
 						init_adc(ADC_MUX_VOLTAGE);
 						standby_measuring_current = 0;
 					}
 				} else {
-					// Наблюдение за напряжением
-					if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 3)) // 0.33 сек
+					// РќР°Р±Р»СЋРґРµРЅРёРµ Р·Р° РЅР°РїСЂСЏР¶РµРЅРёРµРј
+					if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 3)) // 0.33 СЃРµРє
 					{
-						adc_readings_count -= 1; // Первое измерение было выброшено
+						adc_readings_count -= 1; // РџРµСЂРІРѕРµ РёР·РјРµСЂРµРЅРёРµ Р±С‹Р»Рѕ РІС‹Р±СЂРѕС€РµРЅРѕ
 						voltage = (((float)(adc_readings_sum)) / ((float)(adc_readings_count))) / ((float)(ADC_MAX_VAL)) * ((float)(REFERENCE_VOLTAGE)) / ((float)(VOLTAGE_DIVIDER)) * control;
 						
 						init_adc(ADC_MUX_CURRENT);
@@ -339,7 +339,7 @@ int main(void)
 				diff_current = current - prev_current;
 				prev_current = current;
 				
-				if ((current < MINIMUM_CURRENT) || (voltage < MINIMUM_VOLTAGE)) // Если ток пропал, то пора показывать проценты
+				if ((current < MINIMUM_CURRENT) || (voltage < MINIMUM_VOLTAGE)) // Р•СЃР»Рё С‚РѕРє РїСЂРѕРїР°Р», С‚Рѕ РїРѕСЂР° РїРѕРєР°Р·С‹РІР°С‚СЊ РїСЂРѕС†РµРЅС‚С‹
 				{
 					if (display_state != DISPLAY_STATE_PERCENT)
 					{
@@ -364,20 +364,20 @@ int main(void)
 							
 					}
 					
-					// TODO: починить компенсацию яркости
+					// TODO: РїРѕС‡РёРЅРёС‚СЊ РєРѕРјРїРµРЅСЃР°С†РёСЋ СЏСЂРєРѕСЃС‚Рё
 					/*
 					float brightness = 5.0 / voltage;
 					if (brightness > 1.0) brightness = 1.0;
-					brightness_delay = ((uint16_t)( ((float)(0xfffe)) * (1.0 / (brightness * brightness)) )); // Простая коррекция яркости. Оптимальная степень не 2.0, а 2.4
+					brightness_delay = ((uint16_t)( ((float)(0xfffe)) * (1.0 / (brightness * brightness)) )); // РџСЂРѕСЃС‚Р°СЏ РєРѕСЂСЂРµРєС†РёСЏ СЏСЂРєРѕСЃС‚Рё. РћРїС‚РёРјР°Р»СЊРЅР°СЏ СЃС‚РµРїРµРЅСЊ РЅРµ 2.0, Р° 2.4
 					if (brightness_delay < DISPLAY_UPDATE_DELAY) brightness_delay = DISPLAY_UPDATE_DELAY;
 					if (brightness_delay == 0xffff) brightness_delay = 0xfffe;*/
 					brightness_delay = 0xfffe;
 				} else {
 					brightness_delay = 0xfffe;
 				
-					if ((diff_current < -CURRENT_CHANGE_SENSITIVITY) || (diff_current > CURRENT_CHANGE_SENSITIVITY)) // Произошел скачок тока
+					if ((diff_current < -CURRENT_CHANGE_SENSITIVITY) || (diff_current > CURRENT_CHANGE_SENSITIVITY)) // РџСЂРѕРёР·РѕС€РµР» СЃРєР°С‡РѕРє С‚РѕРєР°
 					{
-						device_state = DEVICE_STATE_PREPARE; // Подготовка к измерению
+						device_state = DEVICE_STATE_PREPARE; // РџРѕРґРіРѕС‚РѕРІРєР° Рє РёР·РјРµСЂРµРЅРёСЋ
 						init_adc(ADC_MUX_CONTROL);
 						display_state = DISPLAY_STATE_MEASURING;
 						display_update();
@@ -386,10 +386,10 @@ int main(void)
 				
 			}; break;
 			
-			case DEVICE_STATE_PREPARE: { // Подготовка к измерению тока (0.5 секунды)
-				if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 2)) // 0.5 сек
+			case DEVICE_STATE_PREPARE: { // РџРѕРґРіРѕС‚РѕРІРєР° Рє РёР·РјРµСЂРµРЅРёСЋ С‚РѕРєР° (0.5 СЃРµРєСѓРЅРґС‹)
+				if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 2)) // 0.5 СЃРµРє
 				{
-					adc_readings_count -= 1; // Первое измерение было выброшено
+					adc_readings_count -= 1; // РџРµСЂРІРѕРµ РёР·РјРµСЂРµРЅРёРµ Р±С‹Р»Рѕ РІС‹Р±СЂРѕС€РµРЅРѕ
 					control = ((float)(ADC_HALF_VAL)) / (((float)(adc_readings_sum)) / ((float)(adc_readings_count)));
 					
 					device_state = DEVICE_STATE_MEASURE;
@@ -400,10 +400,10 @@ int main(void)
 				}
 			}; break;
 			
-			case DEVICE_STATE_MEASURE: { // Измерение тока (1 секунда)
-				if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 16)) // 0.05 сек
+			case DEVICE_STATE_MEASURE: { // РР·РјРµСЂРµРЅРёРµ С‚РѕРєР° (1 СЃРµРєСѓРЅРґР°)
+				if (adc_readings_count > (ADC_MEASURINGS_PER_SEC / 16)) // 0.05 СЃРµРє
 				{
-					adc_readings_count -= 1; // Первое измерение было выброшено
+					adc_readings_count -= 1; // РџРµСЂРІРѕРµ РёР·РјРµСЂРµРЅРёРµ Р±С‹Р»Рѕ РІС‹Р±СЂРѕС€РµРЅРѕ
 					current = ((float)(adc_readings_sum)) / ((float)(adc_readings_count)) / ((float)(PRE_COEFF));
 					init_adc(ADC_MUX_CURRENT);
 					
@@ -414,7 +414,7 @@ int main(void)
 					
 					if (measurements_count >= MEASUREMENTS_COUNT)
 					{
-						// Сортировка
+						// РЎРѕСЂС‚РёСЂРѕРІРєР°
 						for (uint8_t i=0; i<MEASUREMENTS_COUNT - 1; i++)
 							for (uint8_t j=i+1; j<MEASUREMENTS_COUNT; j++)
 								if (measurements[i] > measurements[j])
@@ -425,16 +425,16 @@ int main(void)
 									asm("wdr");
 								}
 						
-						// Оцениваем качество измерений
-						if ((measurements[MEASUREMENTS_COUNT / 2 + 1] / measurements[MEASUREMENTS_COUNT / 2 - 1]) < 1.1) // 5 измерений отличаются не более чем на 10%
+						// РћС†РµРЅРёРІР°РµРј РєР°С‡РµСЃС‚РІРѕ РёР·РјРµСЂРµРЅРёР№
+						if ((measurements[MEASUREMENTS_COUNT / 2 + 1] / measurements[MEASUREMENTS_COUNT / 2 - 1]) < 1.1) // 5 РёР·РјРµСЂРµРЅРёР№ РѕС‚Р»РёС‡Р°СЋС‚СЃСЏ РЅРµ Р±РѕР»РµРµ С‡РµРј РЅР° 10%
 						{
-							// Извлечение медианы
+							// РР·РІР»РµС‡РµРЅРёРµ РјРµРґРёР°РЅС‹
 							current = measurements[MEASUREMENTS_COUNT / 2];
 							
 							if (current < MINIMUM_CURRENT)
 							{
 								device_state = DEVICE_STATE_STANDBY;
-								prev_current = current; // Чтобы сразу не вызвать срабатывание измерения
+								prev_current = current; // Р§С‚РѕР±С‹ СЃСЂР°Р·Сѓ РЅРµ РІС‹Р·РІР°С‚СЊ СЃСЂР°Р±Р°С‚С‹РІР°РЅРёРµ РёР·РјРµСЂРµРЅРёСЏ
 								break;
 							}
 							
@@ -448,10 +448,10 @@ int main(void)
 							current = measurements[MEASUREMENTS_COUNT / 2];
 							display_number = 0;
 							display_state = DISPLAY_STATE_ERROR;
-							measured_currents_count = 0; // При ошибке начинаем измерение минимального и максимального тока сначала
+							measured_currents_count = 0; // РџСЂРё РѕС€РёР±РєРµ РЅР°С‡РёРЅР°РµРј РёР·РјРµСЂРµРЅРёРµ РјРёРЅРёРјР°Р»СЊРЅРѕРіРѕ Рё РјР°РєСЃРёРјР°Р»СЊРЅРѕРіРѕ С‚РѕРєР° СЃРЅР°С‡Р°Р»Р°
 						}
 						
-						prev_current = current; // Чтобы сразу не вызвать срабатывание измерения
+						prev_current = current; // Р§С‚РѕР±С‹ СЃСЂР°Р·Сѓ РЅРµ РІС‹Р·РІР°С‚СЊ СЃСЂР°Р±Р°С‚С‹РІР°РЅРёРµ РёР·РјРµСЂРµРЅРёСЏ
 						device_state = DEVICE_STATE_STANDBY;
 						standby_measuring_current = 0;
 						display_update();
@@ -467,6 +467,6 @@ int main(void)
     }
 }
 
-// TODO: точность страдает. убедиться, что виноваты помехи в сети
-// TODO: добавить функцию калибровки
-// TODO: заменить "+ 0.5" на нормальное округление
+// TODO: С‚РѕС‡РЅРѕСЃС‚СЊ СЃС‚СЂР°РґР°РµС‚. СѓР±РµРґРёС‚СЊСЃСЏ, С‡С‚Рѕ РІРёРЅРѕРІР°С‚С‹ РїРѕРјРµС…Рё РІ СЃРµС‚Рё
+// TODO: РґРѕР±Р°РІРёС‚СЊ С„СѓРЅРєС†РёСЋ РєР°Р»РёР±СЂРѕРІРєРё
+// TODO: Р·Р°РјРµРЅРёС‚СЊ "+ 0.5" РЅР° РЅРѕСЂРјР°Р»СЊРЅРѕРµ РѕРєСЂСѓРіР»РµРЅРёРµ
